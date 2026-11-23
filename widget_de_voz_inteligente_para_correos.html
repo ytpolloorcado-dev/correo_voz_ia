@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceMail Assistant Widget</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darker: '#0b0f19',
+                        cardbg: '#111827',
+                    },
+                    keyframes: {
+                        pulseSlow: {
+                            '0%, 100%': { transform: 'scale(1)', opacity: 1 },
+                            '50%': { transform: 'scale(1.15)', opacity: 0.8 },
+                        },
+                        soundWave: {
+                            '0%, 100%': { height: '8px' },
+                            '50%': { height: '24px' },
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulseSlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'wave-1': 'soundWave 0.8s ease-in-out infinite',
+                        'wave-2': 'soundWave 0.5s ease-in-out infinite 0.2s',
+                        'wave-3': 'soundWave 0.7s ease-in-out infinite 0.4s',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-transparent min-h-screen flex items-end justify-end p-6 overflow-hidden pointer-events-none">
+
+    <div id="widgetContainer" class="pointer-events-auto flex flex-col items-end gap-3 w-full max-w-md transition-all duration-300">
+        
+        <div id="previewCard" class="glass-panel w-full rounded-2xl shadow-2xl p-4 text-slate-100 hidden transform translate-y-4 opacity-0 transition-all duration-300">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700/60 mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                    <h3 class="font-semibold text-sm tracking-wide text-indigo-300">Detalles del Correo Enviado</h3>
+                </div>
+                <button id="closePreviewBtn" class="text-slate-400 hover:text-white transition-colors text-xs bg-slate-800/80 px-2 py-1 rounded-lg">
+                    <i class="fa-solid fa-xmark"></i> Cerrar
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="text-slate-400 font-medium block mb-1">Para:</label>
+                    <input type="text" id="emailTo" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500" placeholder="Destinatario...">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-slate-400 font-medium block mb-1">Copia (CC):</label>
+                        <input type="text" id="emailCc" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500" placeholder="Copia...">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 font-medium block mb-1">Asunto:</label>
+                        <input type="text" id="emailSubject" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500" placeholder="Asunto del correo...">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-slate-400 font-medium block mb-1">Mensaje enviado:</label>
+                    <textarea id="emailBody" rows="3" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 resize-none" placeholder="Cuerpo del correo..."></textarea>
+                </div>
+            </div>
+
+            <div class="mt-4 flex items-center justify-between pt-2 border-t border-slate-700/60">
+                <span id="aiConfidence" class="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                    <i class="fa-solid fa-circle-check"></i> Enviado automáticamente
+                </span>
+                <button id="sendEmailBtn" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium px-4 py-2 rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-1.5 active:scale-95">
+                    <i class="fa-solid fa-paper-plane"></i> Reenviar Correo
+                </button>
+            </div>
+        </div>
+
+        <!-- Sección de Grabación Activa con control para cortar audio -->
+        <div id="recordingSection" class="glass-panel w-full sm:w-[390px] rounded-2xl shadow-2xl p-3.5 border border-rose-500/50 text-slate-100 hidden transform translate-y-2 opacity-0 transition-all duration-300">
+            <div class="flex items-center justify-between">
+                <!-- Indicador y temporizador -->
+                <div class="flex items-center gap-3">
+                    <span id="recordingIndicator" class="relative flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                    </span>
+                    <div class="flex flex-col">
+                        <span id="recordingHeader" class="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                            <i id="recordingHeaderIcon" class="fa-solid fa-microphone-lines animate-pulse"></i>
+                            <span id="recordingHeaderText">Grabando voz...</span>
+                        </span>
+                        <span id="recordingTimer" class="text-[11px] text-slate-400 font-mono">00:00 • Habla ahora</span>
+                    </div>
+                </div>
+
+                <!-- Ondas sonoras animadas -->
+                <div id="recordingWaves" class="flex items-center gap-1 h-5 px-1">
+                    <span class="w-1 h-3 bg-rose-500 rounded-full animate-wave-1"></span>
+                    <span class="w-1 h-5 bg-violet-500 rounded-full animate-wave-2"></span>
+                    <span class="w-1 h-6 bg-indigo-500 rounded-full animate-wave-3"></span>
+                    <span class="w-1 h-4 bg-rose-400 rounded-full animate-wave-1"></span>
+                    <span class="w-1 h-5 bg-violet-400 rounded-full animate-wave-2"></span>
+                </div>
+
+                <!-- Botones: Terminar y Cancelar -->
+                <div class="flex items-center gap-1.5">
+                    <button id="stopRecordingBtn" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-medium px-3.5 py-1.5 rounded-xl text-xs shadow-md shadow-rose-600/30 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Terminar de hablar y procesar">
+                        <i class="fa-solid fa-stop text-[10px]"></i>
+                        <span>Terminar</span>
+                    </button>
+                    <button id="cancelRecordingBtn" class="bg-slate-800/90 hover:bg-slate-700 text-slate-400 hover:text-rose-400 p-2 rounded-xl text-xs transition-all border border-slate-700/60 cursor-pointer" title="Cancelar grabación">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-panel w-full sm:w-[390px] h-[72px] rounded-2xl shadow-2xl px-4 flex items-center justify-between relative border border-slate-700/60">
+            
+            <!-- Left: App Identity & Status -->
+            <div class="flex items-center gap-3">
+                <div id="brandIconBox" class="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-sm shadow-inner transition-all">
+                    <i id="brandIcon" class="fa-solid fa-microphone-lines"></i>
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold tracking-tight text-slate-100">LicenciadoGzz AI</span>
+                        <span id="onlineDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span id="statusText" class="text-[11px] text-slate-400 font-medium truncate max-w-[130px]">Listo para escuchar...</span>
+                        <button id="btnResetVoice" class="hidden text-[10px] text-slate-400 hover:text-rose-400 transition-colors" title="Cancelar / Reiniciar">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center/Right Controls: Sound waves or action shortcuts -->
+            <div class="flex items-center gap-2">
+                
+                <!-- Quick simulation button for demo ease -->
+                <button id="demoVoiceBtn" title="Simular comando de voz del usuario" class="bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white p-2.5 rounded-xl text-xs transition-all border border-slate-700/60 flex items-center gap-1 group">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[10px] hidden sm:inline font-medium">Ejemplo</span>
+                </button>
+
+                <!-- Voice Mic Button with Pulse -->
+                <button id="micBtn" class="relative group w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-rose-600 hover:from-indigo-500 hover:to-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-600/25 transition-all transform active:scale-95 cursor-pointer" title="Grabar instrucción de voz">
+                    <div id="micPulse" class="absolute inset-0 rounded-2xl bg-rose-500 opacity-0 transition-opacity"></div>
+                    <i id="micIcon" class="fa-solid fa-microphone text-sm relative z-10 transition-transform"></i>
+                </button>
+
+                <!-- Expand Preview Toggle Button -->
+                <button id="expandToggleBtn" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all border border-slate-700/60 cursor-pointer" title="Ver tarjeta de correo">
+                    <i id="expandChevron" class="fa-solid fa-chevron-up transition-transform duration-300"></i>
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div id="toastContainer" class="fixed top-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script src="widget.js"></script>
+</body>
+</html>
